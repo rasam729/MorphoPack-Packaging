@@ -1,0 +1,10 @@
+{
+  "description": "Showcases MorphoPack's features with interactive tabs, visual guides, and SDG insights, offering users an engaging, informative product overview in light and dark modes.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
