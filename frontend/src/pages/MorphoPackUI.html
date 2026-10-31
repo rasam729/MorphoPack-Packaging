@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MorphoPack — STL to 3D Dieline</title>
+<meta name="description" content="MorphoPack: Upload STL mesh, generate 3D dieline, download SVG — powered by Blender & Trimesh"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+<style>
+/* ── Design tokens from MorphoPackUI ───────────────────────────── */
+:root{
+  --g:#1f4d3a; --g2:#9db38a; --g3:#c6d9bb;
+  --tx:#16261f; --mut:#6b7a72; --ln:#dfe3d8;
+  --cd:rgba(255,255,255,.92); --pl:#e3eed9;
+  --tan:#c9a87c; --bg:#f4f7ef;
+  --shadow:0 4px 24px rgba(31,77,58,.10);
+  --shadow-lg:0 8px 40px rgba(31,77,58,.15);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;font:14px/1.5 Inter,system-ui,sans-serif;color:var(--tx);background:var(--bg)}
+button,input,select{font:inherit}
+
+/* ── Interactive particle canvas ──────────────────────────────── */
+#bg-canvas{position:fixed;inset:0;z-index:0;pointer-events:none}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+
+/* ── Navbar ───────────────────────────────────────────────────── */
+.nav{
+  position:sticky;top:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:60px;
+  background:rgba(255,255,255,.82);
+  backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--ln);
+}
+.nav-logo{display:flex;align-items:center;gap:9px;text-decoration:none;color:var(--tx)}
+.nav-logo-icon{
+  width:34px;height:34px;border-radius:9px;
+  background:var(--g);display:flex;align-items:center;justify-content:center;
+}
+.nav-logo span{font-size:17px;font-weight:700;letter-spacing:-.3px}
+.nav-logo em{color:var(--g);font-style:normal}
+.nav-pills{display:flex;gap:4px}
+.nav-pill{
+  padding:6px 14px;border-radius:8px;border:none;background:transparent;
+  color:var(--mut);font-size:13px;font-weight:500;cursor:pointer;transition:.2s;
+}
+.nav-pill.active,.nav-pill:hover{background:var(--pl);color:var(--g);font-weight:600}
+.nav-actions{display:flex;gap:10px;align-items:center}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;padding:9px 20px;
+  border-radius:9px;border:none;font-size:13px;font-weight:600;cursor:pointer;
+  transition:.18s;text-decoration:none;white-space:nowrap;
+}
+.btn-primary{background:var(--g);color:#fff}
+.btn-primary:hover{background:#163d2e;transform:translateY(-1px);box-shadow:0 4px 16px rgba(31,77,58,.3)}
+.btn-primary:active{transform:none}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-outline{background:transparent;color:var(--g);border:1.5px solid var(--g)}
+.btn-outline:hover{background:var(--pl)}
+.btn-sm{padding:6px 13px;font-size:12px;border-radius:7px}
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.hero{
+  text-align:center;padding:72px 24px 40px;
+  background:radial-gradient(ellipse 70% 55% at 50% -5%,rgba(157,179,138,.22) 0%,transparent 70%);
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 14px;border-radius:100px;
+  background:var(--pl);color:var(--g);font-size:12px;font-weight:600;
+  border:1px solid rgba(31,77,58,.15);margin-bottom:20px;
+}
+.hero h1{font-size:clamp(32px,5vw,54px);font-weight:700;line-height:1.1;letter-spacing:-1.5px;margin-bottom:14px;color:var(--tx)}
+.hero h1 em{color:var(--g);font-style:normal}
+.hero p{font-size:16px;color:var(--mut);max-width:520px;margin:0 auto 28px;line-height:1.65}
+.hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+
+/* ── Main workspace ───────────────────────────────────────────── */
+.workspace{
+  max-width:1320px;margin:0 auto;padding:0 24px 60px;
+  display:grid;grid-template-columns:340px 1fr;gap:24px;align-items:start;
+}
+@media(max-width:900px){.workspace{grid-template-columns:1fr}}
+
+/* ── Panel card ───────────────────────────────────────────────── */
+.panel{
+  background:var(--cd);border:1px solid var(--ln);
+  border-radius:16px;padding:22px;
+  box-shadow:var(--shadow);
+}
+.panel+.panel{margin-top:16px}
+.panel-title{
+  font-size:13px;font-weight:700;color:var(--g);
+  text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;
+  display:flex;align-items:center;gap:7px;
+}
+.panel-title svg{opacity:.7}
+
+/* ── Upload zone ──────────────────────────────────────────────── */
+.upload-zone{
+  border:2px dashed var(--ln);border-radius:12px;padding:32px 20px;
+  text-align:center;cursor:pointer;transition:.2s;
+  background:rgba(255,255,255,.5);
+}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--g);background:var(--pl)}
+.upload-zone input{display:none}
+.upload-icon{
+  width:46px;height:46px;border-radius:12px;
+  background:var(--pl);display:flex;align-items:center;justify-content:center;
+  margin:0 auto 10px;border:1.5px solid rgba(31,77,58,.15);
+}
+.upload-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.upload-sub{font-size:12px;color:var(--mut)}
+.file-chosen{
+  display:flex;align-items:center;gap:10px;padding:10px 12px;
+  background:var(--pl);border-radius:10px;border:1px solid rgba(31,77,58,.15);
+  margin-top:12px;
+}
+.file-name{font-size:13px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-size{font-size:11px;color:var(--mut)}
+
+/* ── Form ─────────────────────────────────────────────────────── */
+.form-row{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+.form-label{font-size:12px;font-weight:600;color:var(--mut);display:flex;align-items:center;gap:5px}
+.form-input{
+  width:100%;padding:9px 12px;background:#fff;
+  border:1.5px solid var(--ln);border-radius:9px;
+  color:var(--tx);font-size:13px;outline:none;transition:.2s;
+}
+.form-input:focus{border-color:var(--g);box-shadow:0 0 0 3px rgba(31,77,58,.08)}
+select.form-input option{background:#fff;color:var(--tx)}
+.dim-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.dim-input-wrap{position:relative}
+.dim-input-wrap input{text-align:right;padding-right:30px}
+.dim-unit{position:absolute;right:9px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--mut);font-family:'JetBrains Mono',monospace}
+
+/* ── Pipeline progress ────────────────────────────────────────── */
+.pipeline-steps{display:flex;flex-direction:column;gap:6px}
+.step-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mut)}
+.step-row.done{color:var(--g);font-weight:500}
+.step-row.active{color:var(--tx);font-weight:600}
+.step-dot{width:8px;height:8px;border-radius:50%;background:var(--ln);flex-shrink:0;transition:.3s}
+.step-dot.done{background:var(--g)}
+.step-dot.active{background:var(--g);animation:pulse-dot 1.2s ease infinite}
+@keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(31,77,58,.4)}50%{box-shadow:0 0 0 5px rgba(31,77,58,0)}}
+.progress-bar-track{width:100%;height:5px;background:var(--ln);border-radius:3px;overflow:hidden;margin:10px 0}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--g),var(--g2));border-radius:3px;transition:width .5s ease}
+
+/* ── 3D Viewer ─────────────────────────────────────────────────── */
+.viewer-tabs{display:flex;gap:4px;background:var(--pl);border-radius:10px;padding:4px;margin-bottom:16px}
+.vtab{
+  flex:1;padding:7px;border-radius:7px;border:none;background:transparent;
+  font-size:13px;font-weight:500;color:var(--mut);cursor:pointer;transition:.2s;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.vtab.active{background:#fff;color:var(--g);font-weight:600;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+.view-panel{display:none}
+.view-panel.active{display:block}
+
+/* 3D model viewer */
+.model-viewer-wrap{
+  border-radius:14px;overflow:hidden;background:#1a2a20;
+  border:1px solid var(--ln);min-height:400px;position:relative;
+}
+model-viewer{width:100%;height:420px;--poster-color:#1a2a20}
+
+/* SVG dieline viewer */
+.dieline-wrap{
+  border:1px solid var(--ln);border-radius:14px;
+  background:#fff;overflow:hidden;position:relative;min-height:400px;
+}
+.dieline-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px;background:rgba(255,255,255,.95);
+  border-bottom:1px solid var(--ln);backdrop-filter:blur(8px);
+}
+.dieline-canvas-wrap{
+  overflow:auto;cursor:grab;position:relative;
+  max-height:440px;
+  display:flex;align-items:flex-start;justify-content:center;
+  padding:20px;
+}
+.dieline-canvas-wrap:active{cursor:grabbing}
+.dieline-canvas-wrap svg{
+  max-width:100%;height:auto;
+  transform-origin:top left;
+  transition:transform .15s;
+  user-select:none;
+}
+.dieline-zoom-info{
+  position:absolute;bottom:10px;right:10px;
+  padding:3px 9px;background:rgba(0,0,0,.5);
+  color:#fff;font-size:11px;border-radius:5px;font-family:'JetBrains Mono',monospace;
+}
+
+/* ── Metric cards ─────────────────────────────────────────────── */
+.metrics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.metric-card{
+  background:var(--pl);border:1px solid rgba(31,77,58,.12);
+  border-radius:12px;padding:14px 16px;
+}
+.metric-val{font-size:22px;font-weight:700;color:var(--g);line-height:1}
+.metric-key{font-size:11px;color:var(--mut);margin-top:4px;font-weight:500}
+.score-ring-wrap{display:flex;justify-content:center;margin:6px 0 10px}
+
+/* ── Status messages ──────────────────────────────────────────── */
+.msg{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:10px;font-size:13px;margin-top:10px}
+.msg-success{background:rgba(31,77,58,.08);border:1px solid rgba(31,77,58,.2);color:var(--g)}
+.msg-error{background:rgba(200,40,40,.07);border:1px solid rgba(200,40,40,.2);color:#b91c1c}
+.msg-info{background:var(--pl);border:1px solid var(--ln);color:var(--tx)}
+
+/* ── Empty states ─────────────────────────────────────────────── */
+.empty-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:400px;text-align:center;padding:40px;gap:14px;color:var(--mut);
+}
+.empty-state-icon{
+  width:64px;height:64px;border-radius:18px;
+  border:2px dashed var(--ln);
+  display:flex;align-items:center;justify-content:center;
+}
+.empty-state h3{font-size:16px;font-weight:600;color:var(--tx)}
+.empty-state p{font-size:13px;max-width:280px;line-height:1.6}
+
+/* ── Spinner ──────────────────────────────────────────────────── */
+.spinner{width:22px;height:22px;border:3px solid rgba(31,77,58,.15);border-top-color:var(--g);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Badges ───────────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:100px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(31,77,58,.1);color:var(--g);border:1px solid rgba(31,77,58,.18)}
+.badge-amber{background:rgba(201,168,124,.15);color:#92600a;border:1px solid rgba(201,168,124,.3)}
+.badge-blue{background:rgba(59,130,246,.08);color:#1d4ed8;border:1px solid rgba(59,130,246,.2)}
+
+/* ── Particles animation ──────────────────────────────────────── */
+@keyframes fadeInUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+.animate-in{animation:fadeInUp .5s ease both}
+.delay-1{animation-delay:.1s}
+.delay-2{animation-delay:.2s}
+.delay-3{animation-delay:.3s}
+
+/* ── Footer ───────────────────────────────────────────────────── */
+.footer{text-align:center;padding:28px;font-size:12px;color:var(--mut);border-top:1px solid var(--ln);background:rgba(255,255,255,.5)}
+</style>
+</head>
+<body>
+
+<!-- Interactive particle canvas background -->
+<canvas id="bg-canvas"></canvas>
+
+<div class="app">
+<!-- ── NAVBAR ─────────────────────────────────────────────────── -->
+<nav class="nav">
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+    </div>
+    <span>Morpho<em>Pack</em></span>
+  </a>
+  <div class="nav-pills">
+    <button class="nav-pill active" onclick="switchTab('workspace')">Workspace</button>
+    <button class="nav-pill" onclick="switchTab('analytics')">Analytics</button>
+    <button class="nav-pill" onclick="switchTab('about')">About</button>
+  </div>
+  <div class="nav-actions">
+    <span id="api-status" class="badge badge-green">● API Live</span>
+    <button class="btn btn-outline btn-sm" onclick="document.getElementById('file-input').click()">Upload STL</button>
+  </div>
+</nav>
+
+<!-- ── HERO ───────────────────────────────────────────────────── -->
+<div id="tab-workspace">
+<section class="hero animate-in">
+  <div class="hero-badge">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+    AI-Powered · Blender 4.5 · Trimesh Pipeline
+  </div>
+  <h1 class="animate-in delay-1">Turn any STL into a<br/><em>3D Dieline</em> instantly</h1>
+  <p class="animate-in delay-2">Upload your 3D mesh, adjust dimensions, and generate manufacturing-ready dielines with real-time sustainability metrics.</p>
+  <div class="hero-actions animate-in delay-3">
+    <button class="btn btn-primary" onclick="document.getElementById('file-input').click()" id="hero-upload-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      Upload STL / OBJ
+    </button>
+    <button class="btn btn-outline" onclick="loadDemo()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Try with Demo Box
+    </button>
+  </div>
+</section>
+
+<!-- ── WORKSPACE GRID ─────────────────────────────────────────── -->
+<main class="workspace">
+
+<!-- LEFT SIDEBAR -->
+<div>
+  <!-- Upload Panel -->
+  <div class="panel animate-in">
+    <div class="panel-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      Upload Mesh
+    </div>
+    <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()"
+      ondragover="event.preventDefault();this.classList.add('drag')"
+      ondragleave="this.classList.remove('drag')"
+      ondrop="handleDrop(event)">
+      <input type="file" id="file-input" accept=".stl,.obj" onchange="handleFileSelect(this.files[0])"/>
+      <div class="upload-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--g)" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+      </div>
+      <div class="upload-title">Drop 3D mesh here</div>
+      <div class="upload-sub">STL · OBJ · Max 100MB</div>
+    </div>
+    <div id="file-info" style="display:none" class="file-chosen">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--g)" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+      <div>
+        <div class="file-name" id="file-name-text">mesh.stl</div>
+        <div class="file-size" id="file-size-text">0 MB</div>
+      </div>
+      <button class="btn btn-sm btn-outline" onclick="clearFile()" style="margin-left:auto">✕</button>
+    </div>
+    <div id="upload-msg"></div>
+  </div>
+
+  <!-- Material & Dimensions -->
+  <div class="panel animate-in delay-1">
+    <div class="panel-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+      Settings
+    </div>
+    <div class="form-row">
+      <label class="form-label">Material</label>
+      <select class="form-input" id="material-select" onchange="updateMetrics()">
+        <option value="mycelium">🌱 Agricultural Mycelium</option>
+        <option value="cardboard" selected>📦 Corrugated Cardboard</option>
+        <option value="kraft">♻️ Recycled Kraft</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <label class="form-label">Override Dimensions (mm)</label>
+      <div class="dim-grid">
+        <div class="dim-input-wrap">
+          <input type="number" class="form-input" id="dim-l" placeholder="L" min="1" oninput="updateMetrics()" step="1"/>
+          <span class="dim-unit">L</span>
+        </div>
+        <div class="dim-input-wrap">
+          <input type="number" class="form-input" id="dim-w" placeholder="W" min="1" oninput="updateMetrics()" step="1"/>
+          <span class="dim-unit">W</span>
+        </div>
+        <div class="dim-input-wrap">
+          <input type="number" class="form-input" id="dim-h" placeholder="H" min="1" oninput="updateMetrics()" step="1"/>
+          <span class="dim-unit">H</span>
+        </div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label class="form-label" style="justify-content:space-between">
+        <span>Degradation</span>
+        <span id="deg-val" style="color:var(--g);font-weight:700">0 months</span>
+      </label>
+      <input type="range" id="degradation" min="0" max="24" value="0" style="width:100%;accent-color:var(--g)" oninput="document.getElementById('deg-val').textContent=this.value+' months';updateMetrics()"/>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="uploadAndRun()" id="run-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Run Pipeline
+      </button>
+      <button class="btn btn-outline" style="justify-content:center" onclick="regenerate()" id="regen-btn" title="Regenerate with current dims">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Pipeline Progress -->
+  <div class="panel animate-in delay-2" id="pipeline-panel" style="display:none">
+    <div class="panel-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Pipeline
+    </div>
+    <div class="progress-bar-track"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    <div class="pipeline-steps" id="pipeline-steps"></div>
+    <div id="pipeline-msg"></div>
+  </div>
+
+  <!-- Quick Metrics -->
+  <div class="panel animate-in delay-3" id="metrics-panel">
+    <div class="panel-title">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Sustainability Score
+    </div>
+    <div class="score-ring-wrap"><svg id="score-ring" width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="50" fill="none" stroke="var(--ln)" stroke-width="10"/>
+      <circle id="score-arc" cx="60" cy="60" r="50" fill="none" stroke="var(--g)" stroke-width="10"
+        stroke-linecap="round" stroke-dasharray="314" stroke-dashoffset="314"
+        transform="rotate(-90 60 60)" style="transition:stroke-dashoffset 1s ease,stroke .5s"/>
+      <text x="60" y="64" text-anchor="middle" font-size="26" font-weight="700" fill="var(--g)" id="score-text">—</text>
+    </svg></div>
+    <div class="metrics-grid" id="metrics-cards">
+      <div class="metric-card"><div class="metric-val" id="m-co2">—</div><div class="metric-key">CO₂ Saved (g)</div></div>
+      <div class="metric-card"><div class="metric-val" id="m-void">—</div><div class="metric-key">Void Reduction</div></div>
+      <div class="metric-card"><div class="metric-val" id="m-mat">—</div><div class="metric-key">Material Saved (g)</div></div>
+      <div class="metric-card"><div class="metric-val" id="m-rec">—</div><div class="metric-key">Recyclability</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT — VIEWER AREA -->
+<div class="animate-in delay-1">
+  <div class="panel" style="padding:16px">
+    <div class="viewer-tabs">
+      <button class="vtab active" onclick="switchView('3d')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        3D Preview
+      </button>
+      <button class="vtab" onclick="switchView('dieline')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+        Dieline SVG
+      </button>
+    </div>
+
+    <!-- 3D Model Viewer -->
+    <div class="view-panel active" id="view-3d">
+      <div class="model-viewer-wrap" id="model-viewer-wrap">
+        <model-viewer id="model-viewer"
+          auto-rotate camera-controls shadow-intensity="1"
+          environment-image="neutral" exposure="0.9" shadow-softness="0.5"
+          style="display:none;width:100%;height:420px">
+        </model-viewer>
+        <div class="empty-state" id="empty-3d">
+          <div class="empty-state-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--g2)" stroke-width="1.5"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <h3>No 3D Preview Yet</h3>
+          <p>Upload an STL/OBJ and run the pipeline to see your mesh in 3D.</p>
+        </div>
+        <div id="loading-3d" style="display:none" class="empty-state">
+          <div class="spinner"></div>
+          <p>Processing mesh with Blender 4.5…</p>
+        </div>
+      </div>
+      <!-- Mesh info bar -->
+      <div id="mesh-info-bar" style="display:none;margin-top:12px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span class="badge badge-green" id="dim-badge">—</span>
+          <span class="badge badge-blue" id="face-badge">—</span>
+          <span class="badge badge-amber" id="vol-badge">—</span>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <a id="download-glb-btn" class="btn btn-outline btn-sm" href="#" download="morphopack_preview.glb" style="display:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download GLB
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dieline SVG Viewer -->
+    <div class="view-panel" id="view-dieline">
+      <div class="dieline-wrap" id="dieline-wrap">
+        <div class="dieline-toolbar">
+          <span style="font-size:13px;font-weight:600;color:var(--g)">Dieline — RSC Box Net</span>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm btn-outline" onclick="zoomDieline(-0.15)">−</button>
+            <span id="zoom-label" style="font-size:11px;font-family:'JetBrains Mono',monospace;min-width:36px;text-align:center">100%</span>
+            <button class="btn btn-sm btn-outline" onclick="zoomDieline(0.15)">+</button>
+            <button class="btn btn-sm btn-outline" onclick="resetDieline()">⊡</button>
+            <a id="download-svg-btn" class="btn btn-primary btn-sm" href="#" download="morphopack_dieline.svg" style="display:none">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download SVG
+            </a>
+          </div>
+        </div>
+        <div class="dieline-canvas-wrap" id="dieline-canvas">
+          <div class="empty-state" id="empty-dieline">
+            <div class="empty-state-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--g2)" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg>
+            </div>
+            <h3>No Dieline Generated</h3>
+            <p>Run the pipeline to generate a downloadable SVG dieline pattern.</p>
+          </div>
+          <div id="loading-dieline" style="display:none" class="empty-state">
+            <div class="spinner"></div>
+            <p>Generating SVG dieline…</p>
+          </div>
+          <div id="svg-container" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</main>
+</div><!-- end tab-workspace -->
+
+<!-- ── ANALYTICS TAB ─────────────────────────────────────────── -->
+<div id="tab-analytics" style="display:none;max-width:1100px;margin:0 auto;padding:32px 24px">
+  <h2 style="font-size:22px;font-weight:700;margin-bottom:6px">Sustainability Analytics</h2>
+  <p style="color:var(--mut);margin-bottom:24px">Real-time environmental impact for your current configuration.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px" id="analytics-cards">
+    <div class="panel"><div style="font-size:12px;color:var(--mut);font-weight:600;margin-bottom:8px">CO₂ REDUCTION</div>
+      <div style="font-size:36px;font-weight:800;color:var(--g)" id="a-co2">—</div><div style="font-size:12px;color:var(--mut)">grams vs EPS baseline</div></div>
+    <div class="panel"><div style="font-size:12px;color:var(--mut);font-weight:600;margin-bottom:8px">MATERIAL SAVED</div>
+      <div style="font-size:36px;font-weight:800;color:var(--tan)" id="a-mat">—</div><div style="font-size:12px;color:var(--mut)" id="a-mat-pct">% lighter than EPS</div></div>
+    <div class="panel"><div style="font-size:12px;color:var(--mut);font-weight:600;margin-bottom:8px">VOID REDUCTION</div>
+      <div style="font-size:36px;font-weight:800;color:#2563eb" id="a-void">—</div><div style="font-size:12px;color:var(--mut)">tighter fit efficiency</div></div>
+    <div class="panel"><div style="font-size:12px;color:var(--mut);font-weight:600;margin-bottom:8px">RECYCLABILITY</div>
+      <div style="font-size:36px;font-weight:800;color:var(--g)" id="a-rec">—</div><div style="font-size:12px;color:var(--mut)" id="a-mat-name">—</div></div>
+  </div>
+  <div class="panel" style="margin-top:20px">
+    <div class="panel-title">Degradation Timeline</div>
+    <canvas id="degradation-chart" height="200"></canvas>
+  </div>
+</div>
+
+<!-- ── ABOUT TAB ──────────────────────────────────────────────── -->
+<div id="tab-about" style="display:none;max-width:760px;margin:0 auto;padding:48px 24px">
+  <h2 style="font-size:28px;font-weight:700;margin-bottom:16px">About MorphoPack</h2>
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="panel">
+      <div class="panel-title">🌱 Mission</div>
+      <p style="color:var(--mut);line-height:1.7">MorphoPack uses AI + Blender 4.5 to convert 3D product meshes into sustainable, manufacturing-ready packaging dielines — reducing material waste and CO₂ emissions.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-title">⚙️ Pipeline</div>
+      <p style="color:var(--mut);line-height:1.7">Upload STL/OBJ → Blender processes: clearance displacement, WELD, DECIMATE, CLEANUP → exports GLB (3D preview) + SVG dieline → sustainability metrics computed in real-time.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📦 Materials Supported</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <span class="badge badge-green">🌱 Agricultural Mycelium</span>
+        <span class="badge badge-amber">📦 Corrugated Cardboard</span>
+        <span class="badge badge-blue">♻️ Recycled Kraft</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<footer class="footer">
+  MorphoPack v2.0 · Blender 4.5 · Trimesh · SDG 12 &amp; 13 · <a href="http://localhost:7071/api/health" target="_blank" style="color:var(--g)">API Health</a>
+</footer>
+</div><!-- .app -->
+
+<script>
+// ── Config ────────────────────────────────────────────────────────
+const API = 'http://localhost:7071/api';
+let pollTimer = null;
+let currentJobId = null;
+let svgScale = 1;
+let currentMetrics = {};
+let chartInstance = null;
+
+// ── Material profiles (client-side) ──────────────────────────────
+const MATERIALS = {
+  mycelium: {name:'Agricultural Mycelium',density:85,co2PerKg:0.42,recyclability:0.98,biodeg:1,voidFill:0.95},
+  cardboard:{name:'Corrugated Cardboard',density:120,co2PerKg:0.89,recyclability:0.87,biodeg:3,voidFill:0.78},
+  kraft:    {name:'Recycled Kraft',density:105,co2PerKg:0.61,recyclability:0.92,biodeg:6,voidFill:0.85},
+};
+const EPS = {co2PerKg:3.29,density:25};
+
+function calcMetrics(l,w,h,mat,deg=0){
+  if(!l||!w||!h) return null;
+  const p=MATERIALS[mat]||MATERIALS.cardboard;
+  const [lm,wm,hm]=[l/1000,w/1000,h/1000];
+  const vol=lm*wm*hm, sa=2*(lm*wm+lm*hm+wm*hm);
+  const mass=sa*0.004*p.density;
+  const co2saved=Math.max(0,(EPS.co2PerKg-p.co2PerKg)*mass)*1000;
+  const matPct=Math.max(0,(1-p.density/EPS.density)*100);
+  const matG=mass*(matPct/100)*1000;
+  const fill=Math.min(1,vol*0.75/Math.max(vol,1e-9));
+  const eff=fill+(1-fill)*p.voidFill;
+  const voidPct=Math.max(0,Math.min(100,((eff-0.6)/0.4)*100));
+  const score=Math.min(100,
+    Math.min(40,(co2saved/Math.max(0.1,EPS.co2PerKg*mass*1000))*40)
+    +p.recyclability*35+(voidPct/100)*25
+    +Math.min(10,Math.max(0,(deg-p.biodeg)/p.biodeg*10))
+  );
+  return {score:Math.round(score*10)/10,co2:Math.round(co2saved),matG:Math.round(matG),matPct:Math.round(matPct),voidPct:Math.round(voidPct),recPct:Math.round(p.recyclability*1000)/10,name:p.name};
+}
+
+// ── Particle background ───────────────────────────────────────────
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W,H,particles=[];
+
+function resizeCanvas(){
+  W=canvas.width=window.innerWidth;
+  H=canvas.height=window.innerHeight;
+}
+
+function initParticles(){
+  particles=[];
+  const N=Math.floor(W*H/14000);
+  for(let i=0;i<N;i++){
+    particles.push({
+      x:Math.random()*W, y:Math.random()*H,
+      r:Math.random()*3+1,
+      vx:(Math.random()-.5)*.3, vy:(Math.random()-.5)*.3,
+      alpha:Math.random()*0.4+0.1,
+      color:Math.random()>.5?'31,77,58':'157,179,138'
+    });
+  }
+}
+
+let mouseX=W/2,mouseY=H/2;
+window.addEventListener('mousemove',e=>{mouseX=e.clientX;mouseY=e.clientY});
+
+function drawParticles(){
+  ctx.clearRect(0,0,W,H);
+  for(let p of particles){
+    // Gentle repulsion from mouse
+    const dx=p.x-mouseX, dy=p.y-mouseY;
+    const dist=Math.sqrt(dx*dx+dy*dy);
+    if(dist<120){
+      p.vx+=dx/dist*.05;
+      p.vy+=dy/dist*.05;
+    }
+    p.vx=Math.max(-1,Math.min(1,p.vx));
+    p.vy=Math.max(-1,Math.min(1,p.vy));
+    p.x+=p.vx; p.y+=p.vy;
+    if(p.x<0)p.x=W; if(p.x>W)p.x=0;
+    if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.color},${p.alpha})`;
+    ctx.fill();
+  }
+  // Draw connections
+  for(let i=0;i<particles.length;i++){
+    for(let j=i+1;j<particles.length;j++){
+      const a=particles[i],b=particles[j];
+      const d=Math.hypot(a.x-b.x,a.y-b.y);
+      if(d<100){
+        ctx.beginPath();
+        ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);
+        ctx.strokeStyle=`rgba(31,77,58,${0.08*(1-d/100)})`;
+        ctx.lineWidth=.8;
+        ctx.stroke();
+      }
+    }
+  }
+  requestAnimationFrame(drawParticles);
+}
+
+window.addEventListener('resize',()=>{resizeCanvas();initParticles()});
+resizeCanvas();initParticles();drawParticles();
+
+// ── Tab switching ─────────────────────────────────────────────────
+function switchTab(t){
+  document.getElementById('tab-workspace').style.display=t==='workspace'?'':'none';
+  document.getElementById('tab-analytics').style.display=t==='analytics'?'':'none';
+  document.getElementById('tab-about').style.display=t==='about'?'':'none';
+  document.querySelectorAll('.nav-pill').forEach((el,i)=>{
+    el.classList.toggle('active',['workspace','analytics','about'][i]===t);
+  });
+  if(t==='analytics') renderAnalyticsCharts();
+}
+
+// ── View switching ────────────────────────────────────────────────
+function switchView(v){
+  document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('view-'+v).classList.add('active');
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+}
+
+// ── File handling ─────────────────────────────────────────────────
+let selectedFile = null;
+
+function handleFileSelect(file){
+  if(!file) return;
+  const ext=file.name.split('.').pop().toLowerCase();
+  if(!['stl','obj'].includes(ext)){showMsg('upload-msg','error',`Unsupported: .${ext}. Use .stl or .obj`);return;}
+  if(file.size>100*1024*1024){showMsg('upload-msg','error','File too large (max 100MB).');return;}
+  selectedFile=file;
+  document.getElementById('file-info').style.display='flex';
+  document.getElementById('file-name-text').textContent=file.name;
+  document.getElementById('file-size-text').textContent=(file.size/1024/1024).toFixed(2)+' MB';
+  document.getElementById('upload-zone').style.display='none';
+  showMsg('upload-msg','success','File ready. Click "Run Pipeline".');
+}
+
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  handleFileSelect(e.dataTransfer.files[0]);
+}
+
+function clearFile(){
+  selectedFile=null;
+  document.getElementById('file-info').style.display='none';
+  document.getElementById('upload-zone').style.display='';
+  document.getElementById('file-input').value='';
+  showMsg('upload-msg','','');
+}
+
+// ── Upload + Run ──────────────────────────────────────────────────
+async function uploadAndRun(){
+  if(!selectedFile && !hasDims()){
+    showMsg('upload-msg','error','Upload a mesh or enter dimensions first.');return;
+  }
+  document.getElementById('pipeline-panel').style.display='';
+  setPipelineStep(0);
+  document.getElementById('run-btn').disabled=true;
+  showLoading3D(true); showLoadingDieline(true);
+
+  try{
+    let jobId=currentJobId;
+    if(selectedFile){
+      const form=new FormData();
+      form.append('mesh',selectedFile);
+      form.append('material',getMat());
+      form.append('degradation_months',getDeg());
+      const up=await fetch(`${API}/upload`,{method:'POST',body:form}).then(r=>r.json());
+      if(up.error) throw new Error(up.error);
+      jobId=up.job_id; currentJobId=jobId;
+    }
+    const dims=getDims();
+    const body={job_id:jobId,...(dims.l&&dims.w&&dims.h?{length_mm:dims.l,width_mm:dims.w,height_mm:dims.h}:{})};
+    await fetch(`${API}/run-pipeline`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    startPolling();
+  }catch(e){
+    showMsg('pipeline-msg','error',e.message);
+    document.getElementById('run-btn').disabled=false;
+    showLoading3D(false); showLoadingDieline(false);
+  }
+}
+
+async function regenerate(){
+  const d=getDims();
+  if(!d.l||!d.w||!d.h){showMsg('upload-msg','error','Enter L, W, H to regenerate.');return;}
+  document.getElementById('pipeline-panel').style.display='';
+  document.getElementById('regen-btn').disabled=true;
+  showLoadingDieline(true);
+  try{
+    await fetch(`${API}/regenerate-dieline`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({length_mm:d.l,width_mm:d.w,height_mm:d.h})});
+    startPolling();
+  }catch(e){
+    showMsg('pipeline-msg','error',e.message);
+    document.getElementById('regen-btn').disabled=false;
+    showLoadingDieline(false);
+  }
+}
+
+// ── Demo mode ─────────────────────────────────────────────────────
+async function loadDemo(){
+  document.getElementById('dim-l').value=200;
+  document.getElementById('dim-w').value=150;
+  document.getElementById('dim-h').value=100;
+  updateMetrics();
+  document.getElementById('pipeline-panel').style.display='';
+  setPipelineStep(0);
+  showLoadingDieline(true);
+  try{
+    const d=getDims();
+    await fetch(`${API}/run-pipeline`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({length_mm:d.l,width_mm:d.w,height_mm:d.h})});
+    startPolling();
+  }catch(e){
+    // fallback: generate client-side demo SVG
+    const svg=buildDemoSVG(200,150,100);
+    loadSVGContent(svg,'200×150×100 mm');
+    showLoadingDieline(false);
+  }
+}
+
+// ── Polling ───────────────────────────────────────────────────────
+const STEPS=['Mesh import & validation','Clearance displacement (2mm)','WELD — merge duplicates','DECIMATE — reduce poly count','CLEANUP — degenerate geometry','Manufacturing threshold check','GLB viewport export','SVG dieline unfold & export'];
+
+function startPolling(){
+  if(pollTimer) clearInterval(pollTimer);
+  pollTimer=setInterval(async()=>{
+    try{
+      const s=await fetch(`${API}/pipeline-status`).then(r=>r.json());
+      updatePipelineUI(s);
+      if(s.status==='done'||s.status==='error'){
+        clearInterval(pollTimer); pollTimer=null;
+        document.getElementById('run-btn').disabled=false;
+        document.getElementById('regen-btn').disabled=false;
+        if(s.status==='done') onPipelineDone(s);
+        else{ showMsg('pipeline-msg','error',s.error||'Pipeline failed'); showLoading3D(false); showLoadingDieline(false); }
+      }
+    }catch{}
+  },1500);
+}
+
+function updatePipelineUI(s){
+  const done=s.steps_done||[];
+  const pct=Math.round(done.length/STEPS.length*100);
+  document.getElementById('progress-fill').style.width=`${s.status==='done'?100:pct}%`;
+  const container=document.getElementById('pipeline-steps');
+  container.innerHTML=STEPS.slice(0,5).map(step=>{
+    const isDone=done.includes(step);
+    const isActive=step===s.step;
+    return `<div class="step-row ${isDone?'done':isActive?'active':''}">
+      <div class="step-dot ${isDone?'done':isActive?'active':''}"></div>
+      ${step}
+    </div>`;
+  }).join('');
+}
+
+async function onPipelineDone(s){
+  showLoading3D(false); showLoadingDieline(false);
+  showMsg('pipeline-msg','success','✅ Pipeline complete!');
+  const out=s.outputs||{};
+  // Load GLB
+  if(out.glb_url){
+    const glbUrl=`${API}${out.glb_url.replace('/api','')}`;
+    const mv=document.getElementById('model-viewer');
+    mv.src=glbUrl;
+    mv.style.display='block';
+    document.getElementById('empty-3d').style.display='none';
+    const dlBtn=document.getElementById('download-glb-btn');
+    dlBtn.href=glbUrl; dlBtn.style.display='inline-flex';
+    document.getElementById('mesh-info-bar').style.display='block';
+    if(out.mesh_metrics){
+      const m=out.mesh_metrics;
+      document.getElementById('dim-badge').textContent=`${Math.round(m.length_mm)}×${Math.round(m.width_mm)}×${Math.round(m.height_mm)} mm`;
+      document.getElementById('face-badge').textContent=`${m.face_count?.toLocaleString()} faces`;
+      document.getElementById('vol-badge').textContent=`Vol: ${(m.volume_mm3/1e6).toFixed(2)} L`;
+      // Auto-fill dims
+      if(!document.getElementById('dim-l').value){
+        document.getElementById('dim-l').value=Math.round(m.length_mm);
+        document.getElementById('dim-w').value=Math.round(m.width_mm);
+        document.getElementById('dim-h').value=Math.round(m.height_mm);
+      }
+      updateMetrics();
+    }
+  }
+  // Load SVG dieline
+  if(out.svg_url){
+    const svgUrl=`${API}${out.svg_url.replace('/api','')}`;
+    try{
+      const text=await fetch(svgUrl).then(r=>r.text());
+      loadSVGContent(text,out.svg_url);
+      const dlBtn=document.getElementById('download-svg-btn');
+      dlBtn.href='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(text);
+      dlBtn.style.display='inline-flex';
+    }catch{}
+  }
+}
+
+// ── SVG Dieline rendering ─────────────────────────────────────────
+function loadSVGContent(svgText,label=''){
+  const container=document.getElementById('svg-container');
+  container.innerHTML=svgText;
+  container.style.display='block';
+  document.getElementById('empty-dieline').style.display='none';
+  document.getElementById('loading-dieline').style.display='none';
+  svgScale=1;
+  applySvgScale();
+}
+
+function zoomDieline(delta){
+  svgScale=Math.max(.2,Math.min(4,svgScale+delta));
+  applySvgScale();
+}
+function resetDieline(){svgScale=1;applySvgScale()}
+function applySvgScale(){
+  const svg=document.querySelector('#svg-container svg');
+  if(svg) svg.style.transform=`scale(${svgScale})`;
+  document.getElementById('zoom-label').textContent=Math.round(svgScale*100)+'%';
+}
+
+// ── Metrics ───────────────────────────────────────────────────────
+function getDims(){
+  return{l:parseFloat(document.getElementById('dim-l').value)||0,w:parseFloat(document.getElementById('dim-w').value)||0,h:parseFloat(document.getElementById('dim-h').value)||0};
+}
+function hasDims(){const d=getDims();return d.l>0&&d.w>0&&d.h>0}
+function getMat(){return document.getElementById('material-select').value}
+function getDeg(){return parseInt(document.getElementById('degradation').value)||0}
+function setPipelineStep(i){}
+
+function updateMetrics(){
+  const d=getDims();
+  const m=calcMetrics(d.l,d.w,d.h,getMat(),getDeg());
+  if(!m){document.getElementById('score-text').textContent='—';return;}
+  currentMetrics=m;
+  // Score ring
+  const circ=2*Math.PI*50, offset=circ*(1-m.score/100);
+  const arc=document.getElementById('score-arc');
+  arc.style.strokeDashoffset=offset;
+  arc.style.stroke=m.score>=80?'#1f4d3a':m.score>=60?'#9db38a':m.score>=40?'#c9a87c':'#dc2626';
+  document.getElementById('score-text').textContent=Math.round(m.score);
+  document.getElementById('m-co2').textContent=m.co2+'g';
+  document.getElementById('m-void').textContent=m.voidPct+'%';
+  document.getElementById('m-mat').textContent=m.matG+'g';
+  document.getElementById('m-rec').textContent=m.recPct+'%';
+  // Analytics tab
+  document.getElementById('a-co2').textContent=m.co2+'g';
+  document.getElementById('a-mat').textContent=m.matG+'g';
+  document.getElementById('a-mat-pct').textContent=m.matPct+'% lighter than EPS';
+  document.getElementById('a-void').textContent=m.voidPct+'%';
+  document.getElementById('a-rec').textContent=m.recPct+'%';
+  document.getElementById('a-mat-name').textContent=m.name;
+}
+
+// ── Analytics charts ──────────────────────────────────────────────
+async function renderAnalyticsCharts(){
+  const d=getDims();
+  if(!d.l||!d.w||!d.h) return;
+  const mat=getMat();
+  const labels=[],data=[];
+  for(let mo=0;mo<=24;mo++){
+    const m=calcMetrics(d.l,d.w,d.h,mat,mo);
+    labels.push(mo+'mo'); data.push(m?m.score:0);
+  }
+  const cvs=document.getElementById('degradation-chart');
+  if(chartInstance) chartInstance.destroy();
+  // Simple chart via canvas
+  const ch=cvs.getContext('2d');
+  chartInstance={destroy:()=>{}};
+  // Draw manually if Chart.js not available
+  const W2=cvs.width=cvs.parentElement.offsetWidth-48||600, H2=cvs.height=200;
+  ch.clearRect(0,0,W2,H2);
+  const pad={l:40,r:20,t:20,b:30};
+  const cw=W2-pad.l-pad.r, cheight=H2-pad.t-pad.b;
+  const maxV=100, minV=0;
+  // Grid
+  ch.strokeStyle='#dfe3d8'; ch.lineWidth=1;
+  for(let y=0;y<=4;y++){
+    const yy=pad.t+cheight*(1-y/4);
+    ch.beginPath();ch.moveTo(pad.l,yy);ch.lineTo(pad.l+cw,yy);ch.stroke();
+    ch.fillStyle='#6b7a72';ch.font='10px Inter';ch.textAlign='right';
+    ch.fillText(Math.round(y/4*100),pad.l-5,yy+4);
+  }
+  // Area fill
+  const pts=data.map((v,i)=>({x:pad.l+i*cw/(data.length-1),y:pad.t+cheight*(1-v/100)}));
+  ch.beginPath();
+  ch.moveTo(pts[0].x,H2-pad.b);
+  pts.forEach(p=>ch.lineTo(p.x,p.y));
+  ch.lineTo(pts[pts.length-1].x,H2-pad.b);
+  ch.closePath();
+  ch.fillStyle='rgba(31,77,58,.08)';ch.fill();
+  // Line
+  ch.beginPath();
+  pts.forEach((p,i)=>i===0?ch.moveTo(p.x,p.y):ch.lineTo(p.x,p.y));
+  ch.strokeStyle='#1f4d3a';ch.lineWidth=2;ch.stroke();
+  // Dots
+  pts.forEach((p,i)=>{
+    if(i%4!==0) return;
+    ch.beginPath();ch.arc(p.x,p.y,3,0,Math.PI*2);
+    ch.fillStyle='#1f4d3a';ch.fill();
+    ch.fillStyle='#6b7a72';ch.font='10px Inter';ch.textAlign='center';
+    ch.fillText(labels[i],p.x,H2-pad.b+14);
+  });
+}
+
+// ── UI helpers ────────────────────────────────────────────────────
+function showMsg(containerId,type,text){
+  const el=document.getElementById(containerId);
+  if(!text){el.innerHTML='';return;}
+  const cls={success:'msg-success',error:'msg-error',info:'msg-info'}[type]||'msg-info';
+  el.innerHTML=`<div class="msg ${cls}">${text}</div>`;
+}
+
+function showLoading3D(show){
+  document.getElementById('loading-3d').style.display=show?'flex':'none';
+  if(show) document.getElementById('empty-3d').style.display='none';
+}
+
+function showLoadingDieline(show){
+  document.getElementById('loading-dieline').style.display=show?'flex':'none';
+  if(show){document.getElementById('empty-dieline').style.display='none';document.getElementById('svg-container').style.display='none';}
+}
+
+// ── Demo SVG builder ──────────────────────────────────────────────
+function buildDemoSVG(l,w,h){
+  const S=1.5,M=50,G=10;
+  const pw=w*S,ph=h*S,pd=l*S,gf=Math.max(22,w*.15*S);
+  const fh=l*.45*S;
+  const TW=pd+pw+pd+pw+gf+2*M, TH=fh*2+ph+2*M;
+  const x0=M,y0=M+15;
+  let s=`<svg xmlns="http://www.w3.org/2000/svg" width="${TW.toFixed(0)}" height="${TH.toFixed(0)}" viewBox="0 0 ${TW.toFixed(0)} ${TH.toFixed(0)}">`;
+  s+=`<style>.cut{fill:none;stroke:#dc2626;stroke-width:2}.fold{fill:none;stroke:#2563eb;stroke-width:1.5;stroke-dasharray:8,4}.panel{fill:#e3eed9;opacity:.5}.label{font:bold 12px Inter,sans-serif;fill:#16261f}.dim{font:10px monospace;fill:#6b7a72}.title{font:bold 15px Inter,sans-serif;fill:#1f4d3a}</style>`;
+  s+=`<rect width="${TW.toFixed(0)}" height="${TH.toFixed(0)}" fill="#f9faf6"/>`;
+  s+=`<text class="title" x="${x0}" y="22">MorphoPack Dieline — ${l}L×${w}W×${h}H mm (RSC Box)</text>`;
+  const panels=[['Depth',pd,l],['Width',pw,w],['Depth',pd,l],['Width',pw,w],['Glue',gf,null]];
+  let x=x0;
+  panels.forEach(([lab,pnw,dim],i)=>{
+    const py=y0+fh;
+    s+=`<rect class="panel" x="${x.toFixed(1)}" y="${py.toFixed(1)}" width="${pnw.toFixed(1)}" height="${ph.toFixed(1)}"/>`;
+    const cx=x+pnw/2,cy=py+ph/2;
+    s+=`<text class="label" x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle">${lab}</text>`;
+    if(dim) s+=`<text class="dim" x="${cx.toFixed(1)}" y="${(cy+16).toFixed(1)}" text-anchor="middle">${dim}mm</text>`;
+    if(i<4){
+      const fh2=fh*(i%2===0?.9:1);
+      s+=`<rect class="panel" x="${x.toFixed(1)}" y="${(py-fh2).toFixed(1)}" width="${pnw.toFixed(1)}" height="${fh2.toFixed(1)}"/>`;
+      s+=`<rect class="panel" x="${x.toFixed(1)}" y="${(py+ph).toFixed(1)}" width="${pnw.toFixed(1)}" height="${fh2.toFixed(1)}"/>`;
+      s+=`<line class="fold" x1="${x.toFixed(1)}" y1="${py.toFixed(1)}" x2="${(x+pnw).toFixed(1)}" y2="${py.toFixed(1)}"/>`;
+      s+=`<line class="fold" x1="${x.toFixed(1)}" y1="${(py+ph).toFixed(1)}" x2="${(x+pnw).toFixed(1)}" y2="${(py+ph).toFixed(1)}"/>`;
+    }
+    if(i>0) s+=`<line class="fold" x1="${x.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y0+fh*2+ph).toFixed(1)}"/>`;
+    x+=pnw;
+  });
+  const totalW=panels.reduce((a,p)=>a+p[1],0);
+  s+=`<rect class="cut" x="${x0.toFixed(1)}" y="${y0.toFixed(1)}" width="${totalW.toFixed(1)}" height="${(fh*2+ph).toFixed(1)}" rx="2"/>`;
+  const ly=y0+fh*2+ph+25;
+  s+=`<line class="cut" x1="${x0}" y1="${ly}" x2="${x0+30}" y2="${ly}"/><text class="dim" x="${x0+35}" y="${ly+4}">Cut line</text>`;
+  s+=`<line class="fold" x1="${x0+110}" y1="${ly}" x2="${x0+140}" y2="${ly}"/><text class="dim" x="${x0+145}" y="${ly+4}">Fold line</text>`;
+  s+=`<text class="dim" x="${x0}" y="${ly+22}">Generated by MorphoPack v2.0</text>`;
+  s+='</svg>';
+  return s;
+}
+
+// ── API health check ──────────────────────────────────────────────
+async function checkAPIHealth(){
+  try{
+    const h=await fetch(`${API}/health`,{signal:AbortSignal.timeout(3000)}).then(r=>r.json());
+    const el=document.getElementById('api-status');
+    if(h.status==='healthy'){
+      el.className='badge badge-green';
+      el.textContent=`● API Live · Blender ${h.blender_available?'✓':'✗'}`;
+    }
+  }catch{
+    const el=document.getElementById('api-status');
+    el.className='badge badge-amber';
+    el.textContent='● API Offline';
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+checkAPIHealth();
+updateMetrics();
+document.getElementById('dim-l').value=200;
+document.getElementById('dim-w').value=150;
+document.getElementById('dim-h').value=100;
+updateMetrics();
+
+// Auto-load a demo dieline on first visit
+window.addEventListener('load',()=>{
+  const demo=buildDemoSVG(200,150,100);
+  loadSVGContent(demo,'Demo');
+  const dlBtn=document.getElementById('download-svg-btn');
+  dlBtn.href='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(demo);
+  dlBtn.style.display='inline-flex';
+});
+</script>
+</body>
+</html>

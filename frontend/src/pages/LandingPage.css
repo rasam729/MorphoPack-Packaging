@@ -1,0 +1,368 @@
+.marketing-home {
+  --marketing-bg: #0a1119;
+  --marketing-panel: #101b25;
+  --marketing-ink: #edf4ef;
+  --marketing-muted: #9aa8a6;
+  --marketing-green: #4bdb8c;
+  min-height: 100vh;
+  padding-top: 64px;
+  overflow: hidden;
+  color: var(--marketing-ink);
+  background:
+    radial-gradient(ellipse at 75% 21%, rgba(35, 130, 83, 0.13), transparent 35%),
+    var(--marketing-bg);
+}
+
+.marketing-nav-inner {
+  max-width: 100% !important;
+  padding: 0 clamp(22px, 5vw, 76px) !important;
+}
+
+.marketing-nav-links {
+  display: flex;
+  align-items: center;
+  gap: clamp(20px, 3.2vw, 48px);
+  margin-left: auto;
+  margin-right: 40px;
+}
+
+.marketing-nav-links a {
+  color: #aab4b6;
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 160ms ease;
+}
+
+.marketing-nav-links a:hover { color: #f5fff8; }
+
+.marketing-hero {
+  position: relative;
+  min-height: min(810px, calc(100vh - 64px));
+  padding: 70px clamp(22px, 7vw, 112px) 42px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  isolation: isolate;
+}
+
+.marketing-hero::before {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  content: '';
+  opacity: 0.16;
+  background-image:
+    linear-gradient(rgba(138, 187, 157, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(138, 187, 157, 0.12) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, black, transparent 90%);
+}
+
+.marketing-hero::after {
+  position: absolute;
+  top: 3%;
+  right: -15%;
+  z-index: -1;
+  width: 66vw;
+  height: 66vw;
+  max-width: 940px;
+  max-height: 940px;
+  border: 1px solid rgba(86, 207, 142, 0.12);
+  border-radius: 50%;
+  content: '';
+  box-shadow: 0 0 0 90px rgba(86, 207, 142, 0.018), 0 0 0 190px rgba(86, 207, 142, 0.014);
+  pointer-events: none;
+}
+
+.marketing-hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(370px, 0.92fr);
+  align-items: center;
+  gap: clamp(35px, 7vw, 110px);
+  width: min(1320px, 100%);
+  margin: 0 auto;
+}
+
+.marketing-hero-copy { position: relative; z-index: 1; }
+
+.marketing-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: #64cf92;
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.17em;
+}
+
+.marketing-kicker i {
+  display: inline-block;
+  width: 24px;
+  height: 1px;
+  background: #45be7a;
+}
+
+.marketing-hero h1,
+.marketing-section-heading h2,
+.marketing-cta h2 {
+  margin: 25px 0 20px;
+  color: #e7e9e9;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: clamp(47px, 6.1vw, 86px);
+  font-weight: 400;
+  line-height: 0.99;
+  letter-spacing: -0.035em;
+}
+
+.marketing-hero h1 em,
+.marketing-section-heading h2 em,
+.marketing-cta h2 em {
+  color: var(--marketing-green);
+  font-weight: 400;
+}
+
+.marketing-hero-copy > p {
+  max-width: 540px;
+  margin: 26px 0 29px;
+  color: #a7b0b3;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.marketing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 13px; }
+
+.marketing-primary,
+.marketing-secondary {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 19px;
+  border-radius: 9px;
+  color: #eefcf3;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.marketing-primary {
+  border: 1px solid #188c50;
+  background: linear-gradient(135deg, #17874c, #11713f);
+  box-shadow: 0 9px 28px rgba(27, 149, 83, 0.19);
+}
+
+.marketing-primary:hover { transform: translateY(-2px); background: #1c9a58; }
+
+.marketing-secondary {
+  border: 1px solid rgba(190, 211, 199, 0.17);
+  background: rgba(255,255,255,0.035);
+  color: #c1ccca;
+}
+
+.marketing-secondary:hover { border-color: rgba(86, 207, 142, 0.5); transform: translateY(-2px); }
+
+.marketing-proof {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 42px;
+  color: #8a9897;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+
+.marketing-proof span { display: inline-flex; align-items: center; gap: 7px; }
+.marketing-proof i, .marketing-model-indicator i { width: 5px; height: 5px; border-radius: 50%; background: #4bdb8c; }
+
+.marketing-hero-visual { position: relative; min-width: 0; padding: 24px; }
+
+.marketing-grid-glow {
+  position: absolute;
+  inset: 9% 4%;
+  border: 1px solid rgba(77, 212, 139, 0.15);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(49, 146, 96, 0.15), transparent 66%);
+  filter: blur(1px);
+}
+
+.landing-model-card {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  border: 1px solid rgba(154, 198, 171, 0.16);
+  border-radius: 17px;
+  background: linear-gradient(145deg, rgba(22, 38, 42, 0.94), rgba(11, 23, 30, 0.86));
+  box-shadow: 0 25px 90px rgba(0,0,0,0.29), inset 0 1px rgba(255,255,255,0.04);
+}
+
+.landing-model-head,
+.landing-model-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 19px;
+}
+
+.landing-model-head {
+  border-bottom: 1px solid rgba(159, 193, 169, 0.11);
+  color: #82938c;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.landing-model-indicator { display: inline-flex; align-items: center; gap: 8px; color: #9ce8b8; }
+.landing-model-canvas { position: relative; height: clamp(330px, 39vw, 485px); cursor: grab; }
+.landing-model-canvas:active { cursor: grabbing; }
+.landing-model-canvas canvas { display: block; width: 100%; height: 100%; }
+.landing-model-error { position: absolute; inset: 0; display: grid; place-items: center; padding: 28px; color: #e7b0a7; text-align: center; }
+
+.landing-model-caption {
+  border-top: 1px solid rgba(159, 193, 169, 0.11);
+}
+
+.landing-model-caption div { display: grid; gap: 3px; }
+.landing-model-caption strong { color: #e8f0ea; font-size: 12px; font-weight: 600; }
+.landing-model-caption span { color: #899993; font-size: 10px; }
+.landing-model-caption > svg { color: #65cf92; }
+
+.marketing-orbit-label,
+.marketing-orbit-dimension,
+.marketing-scroll-note {
+  color: #768a82;
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.marketing-orbit-label { position: absolute; top: -1px; right: 12%; }
+.marketing-orbit-dimension { position: absolute; bottom: -3px; left: 3px; }
+.marketing-orbit-dimension b { color: #59d48e; font-size: 14px; }
+
+.marketing-scroll-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(1320px, 100%);
+  margin: auto auto 0;
+  padding-top: 38px;
+}
+
+.marketing-scroll-note span { width: 27px; height: 1px; background: #44bd79; }
+
+.marketing-stats {
+  border-top: 1px solid rgba(177, 201, 186, 0.1);
+  border-bottom: 1px solid rgba(177, 201, 186, 0.1);
+  background: rgba(255,255,255,0.018);
+}
+
+.marketing-stats-inner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  width: min(1200px, calc(100% - 48px));
+  margin: 0 auto;
+}
+
+.marketing-stat { padding: 28px clamp(12px, 3vw, 38px); border-right: 1px solid rgba(177, 201, 186, 0.1); }
+.marketing-stat:last-child { border-right: 0; }
+.marketing-stat > span { color: #74857e; font-family: 'DM Mono', monospace; font-size: 8px; letter-spacing: .11em; }
+.marketing-stat strong { display: block; margin-top: 11px; color: #ecf1ed; font-family: 'DM Serif Display', Georgia, serif; font-size: 35px; font-weight: 400; }
+.marketing-stat p { margin: 0; color: #9aa7a2; font-size: 11px; }
+
+.marketing-how,
+.marketing-capabilities { padding: 115px 24px; }
+
+.marketing-section-heading { width: min(760px, 100%); margin: 0 auto 54px; text-align: center; }
+.marketing-section-heading h2 { margin: 19px 0 15px; font-size: clamp(38px, 5vw, 59px); line-height: 1.05; }
+.marketing-section-heading > p { max-width: 580px; margin: auto; color: #94a29d; font-size: 14px; line-height: 1.75; }
+
+.marketing-steps,
+.marketing-features { width: min(1180px, 100%); margin: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+.marketing-step {
+  position: relative;
+  min-height: 235px;
+  padding: 24px 21px;
+  border: 1px solid rgba(174, 203, 184, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(21, 33, 39, .87), rgba(14, 24, 31, .75));
+}
+
+.marketing-step-number { color: #63d591; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .13em; }
+.marketing-step-icon { display: grid; width: 42px; height: 42px; margin: 24px 0 17px; place-items: center; border: 1px solid rgba(75, 219, 140, .22); border-radius: 10px; background: rgba(75, 219, 140, .08); color: #77dda0; }
+.marketing-step h3,
+.marketing-feature h3 { margin: 0 0 9px; color: #edf3ee; font-size: 14px; font-weight: 600; }
+.marketing-step p,
+.marketing-feature p { margin: 0; color: #95a29e; font-size: 11px; line-height: 1.7; }
+.marketing-step-line { position: absolute; top: 45px; right: -15px; z-index: 2; width: 15px; height: 1px; background: #47bc79; }
+.marketing-step:last-child .marketing-step-line { display: none; }
+
+.marketing-capabilities { padding-top: 20px; }
+.marketing-features { grid-template-columns: repeat(3, 1fr); }
+.marketing-feature { min-height: 175px; padding: 24px; border-top: 1px solid rgba(174, 203, 184, .17); }
+.marketing-feature > span { display: inline-flex; margin-bottom: 18px; }
+
+.marketing-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto 95px;
+  padding: 47px clamp(25px, 5vw, 65px);
+  border: 1px solid rgba(75, 219, 140, .2);
+  border-radius: 16px;
+  background: radial-gradient(ellipse at 80% 50%, rgba(43, 141, 87, .17), transparent 48%), #101b22;
+}
+
+.marketing-cta h2 { margin: 15px 0 0; font-size: clamp(37px, 5vw, 58px); }
+.marketing-footer { display: grid; grid-template-columns: 1fr 1fr 1fr; align-items: center; gap: 12px; padding: 24px clamp(24px, 7vw, 100px); border-top: 1px solid rgba(177, 201, 186, .1); color: #83918b; }
+.marketing-footer > span { display: inline-flex; align-items: center; gap: 8px; color: #e4ede6; font-size: 14px; font-weight: 700; }
+.marketing-footer > span svg,
+.marketing-footer > span span { color: #53d28a; }
+.marketing-footer p { margin: 0; text-align: center; font-size: 10px; }
+.marketing-footer small { text-align: right; font-size: 9px; }
+
+@media (max-width: 900px) {
+  .marketing-hero { min-height: auto; padding-top: 84px; }
+  .marketing-hero-inner { grid-template-columns: 1fr; gap: 45px; }
+  .marketing-hero-copy { max-width: 700px; margin: auto; text-align: center; }
+  .marketing-hero-copy > p { margin-left: auto; margin-right: auto; }
+  .marketing-actions, .marketing-proof { justify-content: center; }
+  .marketing-hero-visual { width: min(570px, 100%); margin: auto; }
+  .marketing-steps { grid-template-columns: repeat(2, 1fr); }
+  .marketing-step-line { display: none; }
+}
+
+@media (max-width: 640px) {
+  .marketing-nav-inner { padding: 0 16px !important; }
+  .marketing-nav-links { display: none; }
+  .marketing-nav-inner > div:last-child { gap: 7px !important; }
+  .marketing-home .btn-secondary,
+  .marketing-home .btn-primary { padding: 7px 10px !important; font-size: 11px; }
+  .marketing-hero { padding: 62px 20px 34px; }
+  .marketing-hero h1 { font-size: clamp(43px, 12vw, 62px); }
+  .marketing-hero-copy > p { font-size: 14px; }
+  .landing-model-canvas { height: 330px; }
+  .marketing-proof { gap: 10px 15px; font-size: 8px; }
+  .marketing-stats-inner { width: calc(100% - 24px); grid-template-columns: repeat(2, 1fr); }
+  .marketing-stat { padding: 20px 15px; border-bottom: 1px solid rgba(177, 201, 186, 0.1); }
+  .marketing-stat:nth-child(2) { border-right: 0; }
+  .marketing-stat:nth-child(3), .marketing-stat:nth-child(4) { border-bottom: 0; }
+  .marketing-how, .marketing-capabilities { padding: 78px 18px; }
+  .marketing-steps, .marketing-features { grid-template-columns: 1fr; }
+  .marketing-step { min-height: 195px; }
+  .marketing-feature { min-height: auto; }
+  .marketing-cta { width: calc(100% - 32px); margin-bottom: 60px; flex-direction: column; align-items: flex-start; }
+  .marketing-footer { grid-template-columns: 1fr; text-align: center; }
+  .marketing-footer > span { justify-content: center; }
+  .marketing-footer small { text-align: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-home *, .marketing-home *::before, .marketing-home *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+}
