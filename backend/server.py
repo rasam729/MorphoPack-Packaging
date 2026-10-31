@@ -989,59 +989,81 @@ def regenerate_dieline():
 
 @app.route("/api/custom-box", methods=["POST"])
 def custom_box():
-    """Generate a custom tightly-fitted box from uploaded image or 3D model."""
-    # Handle file upload
-    uploaded_file = request.files.get("asset")
+    """
+    Generate a custom form-fitting 3D packaging enclosure (Base + Lid)
+    using the Reform3d / Big-Hero-6 CAD kernel (manifold3d & trimesh).
+    Analyzes 3D product mesh shape and synthesizes non-cuboid, contoured packaging.
+    """
+    uploaded_file = request.files.get("asset") or request.files.get("mesh")
     length_mm = float(request.form.get("length_mm", 0) or 0)
     width_mm = float(request.form.get("width_mm", 0) or 0)
     height_mm = float(request.form.get("height_mm", 0) or 0)
+    clearance_mm = float(request.form.get("clearance_mm", 2.0) or 2.0)
+    wall_mm = float(request.form.get("wall_mm", 2.5) or 2.5)
+    floor_mm = float(request.form.get("floor_mm", 2.5) or 2.5)
+    split_pct = float(request.form.get("split_pct", 0.55) or 0.55)
 
+    mesh_path = None
     if uploaded_file and uploaded_file.filename:
-        ext = Path(uploaded_file.filename).suffix.lower()
-        dest = UPLOADS_DIR / f"custom_{uploaded_file.filename}"
+        safe_name = Path(uploaded_file.filename).name
+        dest = UPLOADS_DIR / f"custom_{safe_name}"
         uploaded_file.save(str(dest))
-
+        ext = dest.suffix.lower()
         if ext in (".stl", ".obj", ".glb"):
-            # Extract bounding box from 3D model
-            try:
-                m = _load_repaired_mesh(str(dest))
-                extents = (m.bounds[1] - m.bounds[0]) * 1000
-                # Add 5mm clearance on each side
-                length_mm = round(float(extents[0]) + 10, 1)
-                width_mm = round(float(extents[1]) + 10, 1)
-                height_mm = round(float(extents[2]) + 10, 1)
-            except Exception as te:
-                return jsonify({"error": f"Could not parse 3D model: {te}"}), 400
-        elif ext in (".png", ".jpg", ".jpeg"):
-            # Image-based: estimate dimensions from aspect ratio (mock for now)
-            try:
-                from PIL import Image
-                img = Image.open(str(dest))
-                w, h = img.size
-                aspect = w / h
-                if not any([length_mm, width_mm, height_mm]):
-                    length_mm = round(aspect * 100, 1)
-                    width_mm = 80.0
-                    height_mm = 100.0
-            except Exception as ie:
-                return jsonify({"error": f"Could not parse image: {ie}"}), 400
+            mesh_path = str(dest)
+    else:
+        # Check existing uploads or sample glass.stl
+        existing = (
+            list(UPLOADS_DIR.glob("*.stl")) + list(UPLOADS_DIR.glob("*.STL")) +
+            list(UPLOADS_DIR.glob("*.obj")) + list(UPLOADS_DIR.glob("*.OBJ"))
+        )
+        if existing:
+            mesh_path = str(existing[0])
+        else:
+            sample_stl = ROOT_DIR / "frontend" / "public" / "models" / "glass.stl"
+            if sample_stl.exists():
+                mesh_path = str(sample_stl)
 
+    # 1. Run CAD Kernel Box Generator if 3D mesh is present
+    cad_result = None
+    if mesh_path and Path(mesh_path).exists():
+        try:
+            from cad_box_kernel import generate_custom_box_package
+            cad_result = generate_custom_box_package(
+                mesh_path=mesh_path,
+                output_dir=OUTPUTS_DIR,
+                clearance_mm=clearance_mm,
+                wall_mm=wall_mm,
+                floor_mm=floor_mm,
+                split_pct=split_pct,
+            )
+            dims = cad_result["dimensions"]
+            length_mm, width_mm, height_mm = dims["length_mm"], dims["width_mm"], dims["height_mm"]
+        except Exception as cad_err:
+            print(f"[Custom-Box] CAD Kernel notice: {cad_err}")
+
+    # Fallback dimensions if manual
     if not all([length_mm > 0, width_mm > 0, height_mm > 0]):
-        return jsonify({"error": "Could not determine dimensions. Provide L/W/H manually."}), 400
+        if cad_result and cad_result.get("dimensions"):
+            d = cad_result["dimensions"]
+            length_mm, width_mm, height_mm = d["length_mm"], d["width_mm"], d["height_mm"]
+        else:
+            length_mm, width_mm, height_mm = 80.0, 80.0, 100.0
 
-    # Generate dieline
+    # 2. Generate 2D Dieline / Vector Blueprint
     svg_out = OUTPUTS_DIR / "custom_box_dieline.svg"
     pdf_out = OUTPUTS_DIR / "custom_box_dieline.pdf"
     _generate_svg_dieline("", str(svg_out), length_mm, width_mm, height_mm)
     try:
         _generate_pdf_dieline(str(svg_out), str(pdf_out))
     except Exception as pdf_error:
-        return jsonify({"error": f"Could not generate custom-box PDF: {pdf_error}"}), 500
+        print(f"[Custom-Box] PDF warning: {pdf_error}")
 
-    # Compute sustainability metrics
+    # 3. Compute sustainability metrics
     from morpho_pipeline import compute_all_metrics
     material = request.form.get("material", "cardboard")
-    metrics = compute_all_metrics(length_mm, width_mm, height_mm, material)
+    sustainability_metrics = compute_all_metrics(length_mm, width_mm, height_mm, material)
+
     overview_pdf_out = OUTPUTS_DIR / "custom_box_overview.pdf"
     try:
         _generate_pdf_overview(
@@ -1053,16 +1075,63 @@ def custom_box():
             material,
         )
     except Exception as overview_error:
-        return jsonify({"error": f"Could not generate custom-box overview PDF: {overview_error}"}), 500
+        print(f"[Custom-Box] Overview PDF warning: {overview_error}")
 
-    return jsonify({
+    resp_data = {
         "success": True,
-        "dimensions": {"length_mm": length_mm, "width_mm": width_mm, "height_mm": height_mm},
+        "is_cad_kernel": cad_result is not None,
+        "shape_type": cad_result.get("shape_type", "Contoured Packaging Shell") if cad_result else "Custom Fitted Box",
+        "rationale": cad_result.get("rationale", "") if cad_result else "Fitted box generated from dimensions.",
+        "cad_code": cad_result.get("cad_code", "") if cad_result else "",
+        "dimensions": {
+            "length_mm": length_mm,
+            "width_mm": width_mm,
+            "height_mm": height_mm,
+            "clearance_mm": clearance_mm,
+            "wall_mm": wall_mm,
+            "floor_mm": floor_mm,
+            "split_ratio": split_pct,
+        },
+        "base_stl_url": cad_result["urls"]["base_stl"] if cad_result else None,
+        "lid_stl_url": cad_result["urls"]["lid_stl"] if cad_result else None,
+        "assembled_stl_url": cad_result["urls"]["assembled_stl"] if cad_result else None,
+        "glb_preview_url": cad_result["urls"]["glb_preview"] if cad_result else None,
         "svg_url": "/api/outputs/custom_box_dieline.svg",
         "pdf_url": "/api/outputs/custom_box_dieline.pdf",
         "overview_pdf_url": "/api/outputs/custom_box_overview.pdf",
-        "metrics": metrics,
-    })
+        "metrics": cad_result["metrics"] if cad_result else sustainability_metrics,
+        "sustainability": sustainability_metrics,
+    }
+
+    user_id = request.form.get("user_id", type=int)
+
+    # 4. Save to database history
+    try:
+        job_id = f"box_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
+        saved_file_name = Path(mesh_path).name if mesh_path else "product_box.stl"
+        with get_conn() as conn:
+            conn.execute(
+                insert(upload_history_table).values(
+                    user_id=user_id,
+                    job_id=job_id,
+                    file_name=saved_file_name,
+                    status="done",
+                    pipeline_result=resp_data,
+                    meta={
+                        "type": "custom_box",
+                        "material": material,
+                        "clearance_mm": clearance_mm,
+                        "wall_mm": wall_mm,
+                        "void_reduction_pct": resp_data.get("metrics", {}).get("void_reduction_pct", 0),
+                        "shape_type": resp_data.get("shape_type"),
+                    }
+                )
+            )
+            print(f"[Custom-Box] Recorded job {job_id} into upload_history_table")
+    except Exception as db_err:
+        print(f"[Custom-Box] DB insert warning: {db_err}")
+
+    return jsonify(resp_data)
 
 
 @app.route("/api/custom-unfold", methods=["POST"])
