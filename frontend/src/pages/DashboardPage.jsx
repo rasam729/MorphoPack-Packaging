@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import {
   AlertCircle, ArrowRight, BarChart3, Box, CheckCircle, Circle, Clock3,
   History, Layers3, Leaf, Package, Play, RotateCcw, SlidersHorizontal,
+  Scissors,
 } from 'lucide-react'
 import api from '../utils/api.js'
 import UploadZone from '../components/UploadZone.jsx'
@@ -12,6 +13,7 @@ import DimensionEditor from '../components/DimensionEditor.jsx'
 import SustainabilityDash from '../components/SustainabilityDash.jsx'
 import HistoryPanel from '../components/HistoryPanel.jsx'
 import CustomBoxPanel from '../components/CustomBoxPanel.jsx'
+import CustomUnfoldPanel from '../components/CustomUnfoldPanel.jsx'
 import InteractiveBackdrop from '../components/InteractiveBackdrop.jsx'
 import SheetNestingPanel from '../components/SheetNestingPanel.jsx'
 import { calcMetrics, MATERIAL_PROFILES } from '../utils/sustainability.js'
@@ -37,6 +39,7 @@ const TABS = [
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 size={15}/> },
   { id: 'history', label: 'History', icon: <History size={15}/> },
   { id: 'custom', label: 'Custom box', icon: <Box size={15}/> },
+  { id: 'unfold', label: 'Custom Dieline Unfold', icon: <Scissors size={15}/> },
 ]
 
 function PipelineProgress({ status, step, stepsDone = [], error }) {
@@ -598,8 +601,8 @@ export default function DashboardPage({ user }) {
 
         {activeTab === 'history' && (
           <section className="studio-secondary-page">
-            <h1>Generated packaging history</h1>
-            <p>Your uploaded meshes and previous packaging outputs.</p>
+            <h1>Packaging pipeline history</h1>
+            <p>All pipeline runs — standard box dielines and custom mesh unfolds — with sustainability &amp; void comparison statistics.</p>
             <HistoryPanel userId={user?.id}/>
           </section>
         )}
@@ -609,6 +612,17 @@ export default function DashboardPage({ user }) {
             <h1>Custom box generator</h1>
             <p>Create a close-fitting box from a product model or specified dimensions.</p>
             <CustomBoxPanel/>
+          </section>
+        )}
+
+        {activeTab === 'unfold' && (
+          <section className="studio-secondary-page">
+            <h1>Custom dieline unfold</h1>
+            <p>
+              Generate a true 2D unfolded SVG dieline directly from your 3D product mesh using the Blender 4.5 Paper Model engine.
+              Results are compared against the standard rectangular box dieline for void reduction, material savings, and CO₂ impact.
+            </p>
+            <CustomUnfoldPanel user={user} defaultMeshFile={meshFile}/>
           </section>
         )}
       </main>
