@@ -1,0 +1,61 @@
+# MorphoPack .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+pip-log.txt
+*.egg-info/
+dist/
+build/
+
+# Environment files
+.env
+*.env.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+*.tsbuildinfo
+
+# Blender
+*.blend
+*.blend1
+
+# Uploads & outputs (don't commit user data)
+MorphoPackEngine/uploads/*
+MorphoPackEngine/outputs/*
+!MorphoPackEngine/uploads/.gitkeep
+!MorphoPackEngine/outputs/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
