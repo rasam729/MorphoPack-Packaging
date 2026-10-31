@@ -1696,46 +1696,24 @@
   }
 }
 
-/* ── Custom Unfold Tab ────────────────────────────────────────────────────── */
-.custom-unfold-container {
-  color: var(--text-primary, #F9FAFB);
+/* ── Custom Unfold & Custom Box White Studio Cards ────────────────────────── */
+.studio-white-card {
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05) !important;
+  border-radius: 14px !important;
+  color: #0F172A !important;
 }
 
-.custom-unfold-container h2 {
-  color: #F9FAFB;
-  line-height: 1.3;
-}
-
-.custom-unfold-container table th {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-}
-
-.custom-unfold-container .upload-zone {
-  transition: border-color 0.2s, background 0.2s;
-}
-
-.custom-unfold-container .upload-zone:hover {
-  border-color: rgba(34,197,94,0.5) !important;
-  background: rgba(34,197,94,0.06) !important;
-}
-
-/* Studio-context overrides so dark glass-card colours read correctly */
-.studio-secondary-page .custom-unfold-container .glass-card {
-  color: #F9FAFB;
-}
-
-/* Responsive collapse for unfold panel left/right split */
 @media (max-width: 960px) {
-  .custom-unfold-container > div[style*="gridTemplateColumns"] {
+  .studio-secondary-page > div[style*="gridTemplateColumns"] {
     grid-template-columns: 1fr !important;
   }
 }
 
 @media (max-width: 720px) {
-  .custom-unfold-container > div[style*="gridTemplateColumns: repeat(4"] {
+  .studio-secondary-page div[style*="repeat(4"] {
     grid-template-columns: repeat(2, 1fr) !important;
   }
 }
+
