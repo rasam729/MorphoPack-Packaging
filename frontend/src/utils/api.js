@@ -36,8 +36,9 @@ const api = {
   pipelineStatus: ()       => request('GET', '/pipeline-status'),
   regenerateDieline: (body)=> request('POST', '/regenerate-dieline', body),
   customBox: (formData)    => request('POST', '/custom-box', formData),
+  customUnfold: (formData) => request('POST', '/custom-unfold', formData),
   getMetrics: (params)     => request('POST', '/metrics', params),
-  history: (userId)        => request('GET', `/history?user_id=${userId}`),
+  history: (userId)        => request('GET', userId ? `/history?user_id=${userId}` : '/history'),
 }
 
 export default api
